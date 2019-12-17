@@ -4,7 +4,7 @@ import dagger.Component
 import io.homeassistant.companion.android.common.dagger.AppComponent
 
 @Component(dependencies = [AppComponent::class])
-interface ReceiverComponent {
+interface NextAlarmBroadcastReceiverComponent {
 
-    fun inject(receiver: LocationBroadcastReceiver)
+    fun inject(receiver: NextAlarmBroadcastReceiver)
 }

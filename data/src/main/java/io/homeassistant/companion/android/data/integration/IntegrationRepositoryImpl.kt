@@ -2,9 +2,7 @@ package io.homeassistant.companion.android.data.integration
 
 import io.homeassistant.companion.android.data.LocalStorage
 import io.homeassistant.companion.android.domain.authentication.AuthenticationRepository
-import io.homeassistant.companion.android.domain.integration.DeviceRegistration
-import io.homeassistant.companion.android.domain.integration.IntegrationRepository
-import io.homeassistant.companion.android.domain.integration.UpdateLocation
+import io.homeassistant.companion.android.domain.integration.*
 import javax.inject.Inject
 import javax.inject.Named
 import okhttp3.HttpUrl
@@ -34,10 +32,45 @@ class IntegrationRepositoryImpl @Inject constructor(
         localStorage.putString(PREF_REMOTE_UI_URL, response.remoteUiUrl)
         localStorage.putString(PREF_SECRET, response.secret)
         localStorage.putString(PREF_WEBHOOK_ID, response.webhookId)
+
+        val nextAlarmSensorRegistration = SensorRegistration(
+            null,
+            "timestamp",
+            "mdi:alarm",
+            "Next Alarm",
+            "0",
+            "sensor",
+            "next_alarm",
+            null
+        )
+        try {
+            registerSensor(nextAlarmSensorRegistration)
+        } catch (e: Exception) {
+
+        }
     }
 
     override suspend fun isRegistered(): Boolean {
         return localStorage.getString(PREF_WEBHOOK_ID) != null
+    }
+
+    override suspend fun registerSensor(sensorRegistration: SensorRegistration) {
+        for (it in getUrls()) {
+            var wasSuccess = false
+            try {
+                wasSuccess = integrationService.updateIntegration(
+                    it,
+                    createRegisterSensorRequest(sensorRegistration)
+                ).isSuccessful
+            } catch (e: Exception) {
+                // Ignore failure until we are out of URLS to try!
+            }
+            // if we had a successful call we can return
+            if (wasSuccess)
+                return
+        }
+
+        throw IntegrationException()
     }
 
     override suspend fun updateLocation(updateLocation: UpdateLocation) {
@@ -45,7 +78,24 @@ class IntegrationRepositoryImpl @Inject constructor(
         for (it in getUrls()) {
             var wasSuccess = false
             try {
-                wasSuccess = integrationService.updateLocation(it, updateLocationRequest).isSuccessful
+                wasSuccess = integrationService.updateIntegration(it, updateLocationRequest).isSuccessful
+            } catch (e: Exception) {
+                // Ignore failure until we are out of URLS to try!
+            }
+            // if we had a successful call we can return
+            if (wasSuccess)
+                return
+        }
+
+        throw IntegrationException()
+    }
+
+    override suspend fun updateNextAlarm(updateSensor: UpdateSensor) {
+        val updateNextAlarmRequest = createUpdateNextAlarm(updateSensor)
+        for (it in getUrls()) {
+            var wasSuccess = false
+            try {
+                wasSuccess = integrationService.updateIntegration(it, updateNextAlarmRequest).isSuccessful
             } catch (e: Exception) {
                 // Ignore failure until we are out of URLS to try!
             }
@@ -100,6 +150,22 @@ class IntegrationRepositoryImpl @Inject constructor(
         )
     }
 
+    private fun createRegisterSensorRequest(sensorRegistration: SensorRegistration): IntegrationRequest {
+        return IntegrationRequest(
+            "register_sensor",
+            SensorRegistration(
+                sensorRegistration.attributes,
+                sensorRegistration.deviceClass,
+                sensorRegistration.icon,
+                sensorRegistration.name,
+                sensorRegistration.state,
+                sensorRegistration.type,
+                sensorRegistration.uniqueId,
+                sensorRegistration.unitOfMeasurement
+            )
+        )
+    }
+
     private fun createUpdateLocation(updateLocation: UpdateLocation): IntegrationRequest {
         return IntegrationRequest(
             "update_location",
@@ -113,6 +179,18 @@ class IntegrationRepositoryImpl @Inject constructor(
                 updateLocation.course,
                 updateLocation.verticalAccuracy
             )
+        )
+    }
+
+    private fun createUpdateNextAlarm(updateSensor: UpdateSensor): IntegrationRequest {
+        return IntegrationRequest(
+            "update_sensor_states",
+            listOf(UpdateSensor(
+                updateSensor.attributes,
+                updateSensor.state,
+                updateSensor.type,
+                updateSensor.uniqueId
+            ))
         )
     }
 }

@@ -151,7 +151,7 @@ object IntegrationRepositoryImplSpec : Spek({
                     coEvery { localStorage.getString("cloud_url") } returns "http://best.com/hook/id"
                     coEvery { localStorage.getString("remote_ui_url") } returns "http://better.com"
                     coEvery {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             any(), // "http://example.com/api/webhook/FGHIJ",
                             any() // integrationRequest
                         )
@@ -161,7 +161,7 @@ object IntegrationRepositoryImplSpec : Spek({
 
                 it("should call the service.") {
                     coVerify {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             "http://best.com/hook/id".toHttpUrl(),
                             integrationRequest
                         )
@@ -197,7 +197,7 @@ object IntegrationRepositoryImplSpec : Spek({
                     coEvery { localStorage.getString("cloud_url") } returns null
                     coEvery { localStorage.getString("remote_ui_url") } returns "http://better.com"
                     coEvery {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             any(), // "http://example.com/api/webhook/FGHIJ",
                             any() // integrationRequest
                         )
@@ -207,7 +207,7 @@ object IntegrationRepositoryImplSpec : Spek({
 
                 it("should call the service.") {
                     coVerify {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             "http://better.com/api/webhook/FGHIJ".toHttpUrl(),
                             integrationRequest
                         )
@@ -243,7 +243,7 @@ object IntegrationRepositoryImplSpec : Spek({
                     coEvery { localStorage.getString("cloud_url") } returns null
                     coEvery { localStorage.getString("remote_ui_url") } returns null
                     coEvery {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             any(), // "http://example.com/api/webhook/FGHIJ",
                             any() // integrationRequest
                         )
@@ -253,7 +253,7 @@ object IntegrationRepositoryImplSpec : Spek({
 
                 it("should call the service.") {
                     coVerify {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             "http://example.com/api/webhook/FGHIJ".toHttpUrl(),
                             integrationRequest
                         )
@@ -290,7 +290,7 @@ object IntegrationRepositoryImplSpec : Spek({
                     coEvery { localStorage.getString("cloud_url") } returns "http://best.com/hook/id"
                     coEvery { localStorage.getString("remote_ui_url") } returns "http://better.com"
                     coEvery {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             "http://best.com/hook/id".toHttpUrl(),
                             any() // integrationRequest
                         )
@@ -298,7 +298,7 @@ object IntegrationRepositoryImplSpec : Spek({
                         every { isSuccessful } returns false
                     }
                     coEvery {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             "http://better.com/api/webhook/FGHIJ".toHttpUrl(),
                             any() // integrationRequest
                         )
@@ -309,11 +309,11 @@ object IntegrationRepositoryImplSpec : Spek({
 
                 it("should call service 2 times") {
                     coVerifyAll {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             "http://best.com/hook/id".toHttpUrl(),
                             integrationRequest
                         )
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             "http://better.com/api/webhook/FGHIJ".toHttpUrl(),
                             integrationRequest
                         )
@@ -339,7 +339,7 @@ object IntegrationRepositoryImplSpec : Spek({
                     coEvery { localStorage.getString("cloud_url") } returns "http://best.com/hook/id"
                     coEvery { localStorage.getString("remote_ui_url") } returns "http://better.com"
                     coEvery {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             "http://best.com/hook/id".toHttpUrl(),
                             any() // integrationRequest
                         )
@@ -347,7 +347,7 @@ object IntegrationRepositoryImplSpec : Spek({
                         every { isSuccessful } returns false
                     }
                     coEvery {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             "http://better.com/api/webhook/FGHIJ".toHttpUrl(),
                             any() // integrationRequest
                         )
@@ -355,7 +355,7 @@ object IntegrationRepositoryImplSpec : Spek({
                         every { isSuccessful } returns false
                     }
                     coEvery {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             "http://example.com/api/webhook/FGHIJ".toHttpUrl(),
                             any() // integrationRequest
                         )
@@ -399,7 +399,7 @@ object IntegrationRepositoryImplSpec : Spek({
                     coEvery { localStorage.getString("cloud_url") } returns null
                     coEvery { localStorage.getString("remote_ui_url") } returns "http://better.com/"
                     coEvery {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             any(), // "http://example.com/api/webhook/FGHIJ",
                             any() // integrationRequest
                         )
@@ -409,7 +409,7 @@ object IntegrationRepositoryImplSpec : Spek({
 
                 it("should call the service.") {
                     coVerify {
-                        integrationService.updateLocation(
+                        integrationService.updateIntegration(
                             "http://better.com/api/webhook/FGHIJ".toHttpUrl(),
                             integrationRequest
                         )

@@ -6,5 +6,9 @@ interface IntegrationRepository {
 
     suspend fun isRegistered(): Boolean
 
+    suspend fun registerSensor(sensorRegistration: SensorRegistration)
+
     suspend fun updateLocation(updateLocation: UpdateLocation)
+
+    suspend fun updateNextAlarm(updateSensor: UpdateSensor)
 }

@@ -52,7 +52,7 @@ class LocationBroadcastReceiver : BroadcastReceiver() {
 
     private fun ensureInjected(context: Context) {
         if (context.applicationContext is GraphComponentAccessor) {
-            DaggerReceiverComponent.builder()
+            DaggerLocationBroadcastReceiverComponent.builder()
                 .appComponent((context.applicationContext as GraphComponentAccessor).appComponent)
                 .build()
                 .inject(this)
