@@ -10,6 +10,31 @@ class IntegrationUseCaseImpl @Inject constructor(
         integrationRepository.registerDevice(deviceRegistration)
     }
 
+    override suspend fun updateRegistration(
+        appVersion: String,
+        deviceName: String,
+        manufacturer: String,
+        model: String,
+        osVersion: String,
+        appData: HashMap<String, String>
+    ) {
+
+        integrationRepository.updateRegistration(
+            DeviceRegistration(
+                null,
+                null,
+                appVersion,
+                deviceName,
+                manufacturer,
+                model,
+                null,
+                osVersion,
+                null,
+                appData
+            )
+        )
+    }
+
     override suspend fun isRegistered(): Boolean {
         return integrationRepository.isRegistered()
     }
@@ -20,6 +45,26 @@ class IntegrationUseCaseImpl @Inject constructor(
 
     override suspend fun updateLocation(updateLocation: UpdateLocation) {
         return integrationRepository.updateLocation(updateLocation)
+    }
+
+    override suspend fun getZones(): Array<Entity<ZoneAttributes>> {
+        return integrationRepository.getZones()
+    }
+
+    override suspend fun setZoneTrackingEnabled(enabled: Boolean) {
+        return integrationRepository.setZoneTrackingEnabled(enabled)
+    }
+
+    override suspend fun isZoneTrackingEnabled(): Boolean {
+        return integrationRepository.isZoneTrackingEnabled()
+    }
+
+    override suspend fun setBackgroundTrackingEnabled(enabled: Boolean) {
+        return integrationRepository.setBackgroundTrackingEnabled(enabled)
+    }
+
+    override suspend fun isBackgroundTrackingEnabled(): Boolean {
+        return integrationRepository.isBackgroundTrackingEnabled()
     }
 
     override suspend fun updateNextAlarm(updateSensor: UpdateSensor) {

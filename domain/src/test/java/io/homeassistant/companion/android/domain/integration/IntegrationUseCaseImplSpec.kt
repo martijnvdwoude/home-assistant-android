@@ -39,6 +39,34 @@ object IntegrationUseCaseImplSpec : Spek({
             }
         }
 
+        describe("updateRegistration") {
+            beforeEachTest {
+                coEvery {
+                    integrationRepository.updateRegistration(any())
+                } just Runs
+
+                runBlocking {
+                    useCase.updateRegistration("1", "2", "3", "4", "5", hashMapOf())
+                }
+            }
+
+            it("should call repository") {
+                coVerify {
+                    integrationRepository.updateRegistration(DeviceRegistration(
+                        null,
+                        null,
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        null,
+                        "5",
+                        null,
+                        hashMapOf()))
+                }
+            }
+        }
+
         describe("isRegistered") {
             beforeEachTest {
                 runBlocking { useCase.isRegistered() }
@@ -57,6 +85,56 @@ object IntegrationUseCaseImplSpec : Spek({
 
             it("should call the repository") {
                 coVerify { integrationRepository.updateLocation(location) }
+            }
+        }
+
+        describe("getZones") {
+            beforeEachTest {
+                runBlocking { useCase.getZones() }
+            }
+
+            it("should call the repository") {
+                coVerify { integrationRepository.getZones() }
+            }
+        }
+
+        describe("setZoneTrackingEnabled") {
+            beforeEachTest {
+                runBlocking { useCase.setZoneTrackingEnabled(true) }
+            }
+
+            it("should call the repository") {
+                coVerify { integrationRepository.setZoneTrackingEnabled(true) }
+            }
+        }
+
+        describe("isZoneTrackingEnabled") {
+            beforeEachTest {
+                runBlocking { useCase.isZoneTrackingEnabled() }
+            }
+
+            it("should call the repository") {
+                coVerify { integrationRepository.isZoneTrackingEnabled() }
+            }
+        }
+
+        describe("setBackgroundTrackingEnabled") {
+            beforeEachTest {
+                runBlocking { useCase.setBackgroundTrackingEnabled(true) }
+            }
+
+            it("should call the repository") {
+                coVerify { integrationRepository.setBackgroundTrackingEnabled(true) }
+            }
+        }
+
+        describe("isBackgroundTrackingEnabled") {
+            beforeEachTest {
+                runBlocking { useCase.isBackgroundTrackingEnabled() }
+            }
+
+            it("should call the repository") {
+                coVerify { integrationRepository.isBackgroundTrackingEnabled() }
             }
         }
     }
