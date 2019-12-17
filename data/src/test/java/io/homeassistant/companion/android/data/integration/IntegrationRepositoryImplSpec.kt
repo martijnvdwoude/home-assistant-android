@@ -3,13 +3,17 @@ package io.homeassistant.companion.android.data.integration
 import io.homeassistant.companion.android.data.LocalStorage
 import io.homeassistant.companion.android.domain.authentication.AuthenticationRepository
 import io.homeassistant.companion.android.domain.integration.DeviceRegistration
+import io.homeassistant.companion.android.domain.integration.Entity
 import io.homeassistant.companion.android.domain.integration.UpdateLocation
+import io.homeassistant.companion.android.domain.integration.ZoneAttributes
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyAll
 import io.mockk.every
 import io.mockk.mockk
 import java.net.URL
+import java.util.Calendar
+import java.util.HashMap
 import kotlin.properties.Delegates
 import kotlinx.coroutines.runBlocking
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -83,6 +87,55 @@ object IntegrationRepositoryImplSpec : Spek({
                     localStorage.putString("remote_ui_url", "https://home-assistant.io/2/")
                     localStorage.putString("secret", "ABCDE")
                     localStorage.putString("webhook_id", "FGHIJ")
+                }
+            }
+        }
+
+        describe("registerDevice") {
+            val deviceRegistration = DeviceRegistration(
+                "appId",
+                "appName",
+                "appVersion",
+                "deviceName",
+                "manufacturer",
+                "model",
+                "osName",
+                "osVersion",
+                false,
+                null
+            )
+            val registerDeviceRequest = RegisterDeviceRequest(
+                deviceRegistration.appId,
+                deviceRegistration.appName,
+                deviceRegistration.appVersion,
+                deviceRegistration.deviceName,
+                deviceRegistration.manufacturer,
+                deviceRegistration.model,
+                deviceRegistration.osName,
+                deviceRegistration.osVersion,
+                deviceRegistration.supportsEncryption,
+                deviceRegistration.appData
+            )
+            beforeEachTest {
+                coEvery {
+                    integrationService.updateRegistration(any(), IntegrationRequest("update_registration", registerDeviceRequest))
+                } returns Response.success(null)
+
+                coEvery { authenticationRepository.getUrl() } returns URL("http://example.com")
+                coEvery { localStorage.getString("webhook_id") } returns "FGHIJ"
+                coEvery { localStorage.getString("cloud_url") } returns "http://best.com/hook/id"
+                coEvery { localStorage.getString("remote_ui_url") } returns "http://better.com"
+
+                runBlocking {
+                    repository.updateRegistration(deviceRegistration)
+                }
+            }
+
+            it("should call the service") {
+                coVerify {
+                    integrationService.updateRegistration(
+                        "http://best.com/hook/id".toHttpUrl(),
+                        IntegrationRequest("update_registration", registerDeviceRequest))
                 }
             }
         }
@@ -413,6 +466,89 @@ object IntegrationRepositoryImplSpec : Spek({
                             "http://better.com/api/webhook/FGHIJ".toHttpUrl(),
                             integrationRequest
                         )
+                    }
+                }
+            }
+        }
+
+        describe("get zones") {
+            beforeEachTest {
+                coEvery { localStorage.getString("cloud_url") } returns "https://best.com"
+                coEvery { localStorage.getString("remote_ui_url") } returns "http://better.com/"
+                coEvery { authenticationRepository.getUrl() } returns URL("http://example.com")
+                coEvery { localStorage.getString("webhook_id") } returns "FGHIJ"
+            }
+            describe("getZones") {
+                val entities = EntityResponse(
+                    "entityId",
+                    "state",
+                    ZoneAttributes(
+                        false,
+                        0.0,
+                        1.1,
+                        2.2F,
+                        "fName",
+                        "icon"
+                    ),
+                    Calendar.getInstance(),
+                    Calendar.getInstance(),
+                    HashMap()
+                )
+                var zones: Array<Entity<ZoneAttributes>>? = null
+                beforeEachTest {
+                    coEvery { integrationService.getZones(any(), any()) } returns arrayOf(entities)
+                    runBlocking { zones = repository.getZones() }
+                }
+                it("should return true when webhook has a value") {
+                    assertThat(zones).isNotNull
+                    assertThat(zones!!.size).isEqualTo(1)
+                    assertThat(zones!![0]).isNotNull
+                    assertThat(zones!![0].entityId).isEqualTo(entities.entityId)
+                }
+            }
+        }
+
+        describe("location settings") {
+            describe("isZoneTrackingEnabled") {
+                var isZoneTrackingEnabled by Delegates.notNull<Boolean>()
+                beforeEachTest {
+                    coEvery { localStorage.getBoolean("zone_enabled") } returns true
+                    runBlocking { isZoneTrackingEnabled = repository.isZoneTrackingEnabled() }
+                }
+                it("should return what is stored") {
+                    assertThat(isZoneTrackingEnabled).isTrue()
+                }
+            }
+
+            describe("setZoneTrackingEnabled") {
+                beforeEachTest {
+                    runBlocking { repository.setZoneTrackingEnabled(true) }
+                }
+                it("should return what is stored") {
+                    coVerify {
+                        localStorage.putBoolean("zone_enabled", true)
+                    }
+                }
+            }
+
+            describe("isBackgroundTrackingEnabled") {
+                var isBackgroundTrackingEnabled by Delegates.notNull<Boolean>()
+                beforeEachTest {
+                    coEvery { localStorage.getBoolean("background_enabled") } returns true
+                    runBlocking { isBackgroundTrackingEnabled = repository.isBackgroundTrackingEnabled() }
+                }
+                it("should return what is stored") {
+                    assertThat(isBackgroundTrackingEnabled).isTrue()
+                }
+            }
+
+            describe("setBackgroundTrackingEnabled") {
+                beforeEachTest {
+                    runBlocking { repository.setBackgroundTrackingEnabled(true) }
+                }
+                it("should return what is stored") {
+                    coVerify {
+                        localStorage.putBoolean("background_enabled", true)
                     }
                 }
             }

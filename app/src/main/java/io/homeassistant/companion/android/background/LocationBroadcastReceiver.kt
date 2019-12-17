@@ -1,22 +1,24 @@
 package io.homeassistant.companion.android.background
 
-import android.Manifest.permission.ACCESS_COARSE_LOCATION
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
+import android.location.Location
 import android.os.BatteryManager
 import android.os.Build
 import android.util.Log
-import androidx.core.app.ActivityCompat
+import com.google.android.gms.location.Geofence
+import com.google.android.gms.location.GeofencingEvent
+import com.google.android.gms.location.GeofencingRequest
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import io.homeassistant.companion.android.common.dagger.GraphComponentAccessor
 import io.homeassistant.companion.android.domain.integration.IntegrationUseCase
 import io.homeassistant.companion.android.domain.integration.UpdateLocation
+import io.homeassistant.companion.android.util.PermissionManager
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +32,8 @@ class LocationBroadcastReceiver : BroadcastReceiver() {
             "io.homeassistant.companion.android.background.REQUEST_UPDATES"
         const val ACTION_PROCESS_LOCATION =
             "io.homeassistant.companion.android.background.PROCESS_UPDATES"
+        const val ACTION_PROCESS_GEO =
+            "io.homeassistant.companion.android.background.PROCESS_GEOFENCE"
 
         private const val TAG = "LocBroadcastReceiver"
     }
@@ -43,9 +47,10 @@ class LocationBroadcastReceiver : BroadcastReceiver() {
         ensureInjected(context)
 
         when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED -> requestUpdates(context)
-            ACTION_REQUEST_LOCATION_UPDATES -> requestUpdates(context)
-            ACTION_PROCESS_LOCATION -> handleUpdate(context, intent)
+            Intent.ACTION_BOOT_COMPLETED -> setupLocationTracking(context)
+            ACTION_REQUEST_LOCATION_UPDATES -> setupLocationTracking(context)
+            ACTION_PROCESS_LOCATION -> handleLocationUpdate(context, intent)
+            ACTION_PROCESS_GEO -> handleGeoUpdate(context, intent)
             else -> Log.w(TAG, "Unknown intent action: ${intent.action}!")
         }
     }
@@ -61,60 +66,114 @@ class LocationBroadcastReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun requestUpdates(context: Context) {
-        Log.d(TAG, "Registering for location updates.")
-
-        if (ActivityCompat.checkSelfPermission(
-                context,
-                ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+    private fun setupLocationTracking(context: Context) {
+        if (!PermissionManager.hasLocationPermissions(context)) {
             Log.w(TAG, "Not starting location reporting because of permissions.")
             return
         }
 
-        val fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
+        mainScope.launch {
+            try {
+                removeAllLocationUpdateRequests(context)
 
-        fusedLocationProviderClient.requestLocationUpdates(
-            createLocationRequest(),
-            getLocationUpdateIntent(context)
-        )
-    }
-
-    private fun handleUpdate(context: Context, intent: Intent) {
-        Log.d(TAG, "Received location update.")
-        LocationResult.extractResult(intent)?.lastLocation?.let {
-
-            Log.d(
-                TAG, "Last Location: " +
-                    "\nCoords:(${it.latitude}, ${it.longitude})" +
-                    "\nAccuracy: ${it.accuracy}" +
-                    "\nBearing: ${it.bearing}"
-            )
-            val updateLocation = UpdateLocation(
-                "",
-                arrayOf(it.latitude, it.longitude),
-                it.accuracy.toInt(),
-                getBatteryLevel(context),
-                it.speed.toInt(),
-                it.altitude.toInt(),
-                it.bearing.toInt(),
-                if (Build.VERSION.SDK_INT >= 26) it.verticalAccuracyMeters.toInt() else null
-            )
-
-            mainScope.launch {
-                try {
-                    integrationUseCase.updateLocation(updateLocation)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Could not update location.", e)
-                }
+                if (integrationUseCase.isBackgroundTrackingEnabled())
+                    requestLocationUpdates(context)
+                if (integrationUseCase.isZoneTrackingEnabled())
+                    requestZoneUpdates(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "Issue setting up location tracking", e)
             }
         }
     }
 
-    private fun getLocationUpdateIntent(context: Context): PendingIntent {
+    private fun removeAllLocationUpdateRequests(context: Context) {
+        Log.d(TAG, "Removing all location requests.")
+        val fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
+        val backgroundIntent = getLocationUpdateIntent(context, false)
+
+        fusedLocationProviderClient.removeLocationUpdates(backgroundIntent)
+
+        val geofencingClient = LocationServices.getGeofencingClient(context)
+        val zoneIntent = getLocationUpdateIntent(context, true)
+        geofencingClient.removeGeofences(zoneIntent)
+    }
+
+    private fun requestLocationUpdates(context: Context) {
+        Log.d(TAG, "Registering for location updates.")
+
+        val fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
+        val intent = getLocationUpdateIntent(context, false)
+
+        fusedLocationProviderClient.requestLocationUpdates(
+            createLocationRequest(),
+            intent
+        )
+    }
+
+    private suspend fun requestZoneUpdates(context: Context) {
+        Log.d(TAG, "Registering for zone based location updates")
+
+        try {
+            val geofencingClient = LocationServices.getGeofencingClient(context)
+            val intent = getLocationUpdateIntent(context, true)
+            val geofencingRequest = createGeofencingRequest()
+            geofencingClient.addGeofences(
+                geofencingRequest,
+                intent
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Issue requesting zone updates.", e)
+        }
+    }
+
+    private fun handleLocationUpdate(context: Context, intent: Intent) {
+        Log.d(TAG, "Received location update.")
+        LocationResult.extractResult(intent)?.lastLocation?.let {
+            sendLocationUpdate(it, context)
+        }
+    }
+
+    private fun handleGeoUpdate(context: Context, intent: Intent) {
+        Log.d(TAG, "Received geofence update.")
+        val geofencingEvent = GeofencingEvent.fromIntent(intent)
+        if (geofencingEvent.hasError()) {
+            Log.e(TAG, "Error getting geofence broadcast status code: ${geofencingEvent.errorCode}")
+            return
+        }
+
+        sendLocationUpdate(geofencingEvent.triggeringLocation, context)
+    }
+
+    private fun sendLocationUpdate(location: Location, context: Context) {
+        Log.d(
+            TAG, "Last Location: " +
+                    "\nCoords:(${location.latitude}, ${location.longitude})" +
+                    "\nAccuracy: ${location.accuracy}" +
+                    "\nBearing: ${location.bearing}"
+        )
+        val updateLocation = UpdateLocation(
+            "",
+            arrayOf(location.latitude, location.longitude),
+            location.accuracy.toInt(),
+            getBatteryLevel(context),
+            location.speed.toInt(),
+            location.altitude.toInt(),
+            location.bearing.toInt(),
+            if (Build.VERSION.SDK_INT >= 26) location.verticalAccuracyMeters.toInt() else 0
+        )
+
+        mainScope.launch {
+            try {
+                integrationUseCase.updateLocation(updateLocation)
+            } catch (e: Exception) {
+                Log.e(TAG, "Could not update location.", e)
+            }
+        }
+    }
+
+    private fun getLocationUpdateIntent(context: Context, isGeofence: Boolean): PendingIntent {
         val intent = Intent(context, LocationBroadcastReceiver::class.java)
-        intent.action = ACTION_PROCESS_LOCATION
+        intent.action = if (isGeofence) ACTION_PROCESS_GEO else ACTION_PROCESS_LOCATION
         return PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
@@ -128,6 +187,25 @@ class LocationBroadcastReceiver : BroadcastReceiver() {
         locationRequest.priority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
 
         return locationRequest
+    }
+
+    private suspend fun createGeofencingRequest(): GeofencingRequest {
+        val geofencingRequestBuilder = GeofencingRequest.Builder()
+        integrationUseCase.getZones().forEach {
+            geofencingRequestBuilder.addGeofence(
+                Geofence.Builder()
+                    .setRequestId(it.entityId)
+                    .setCircularRegion(
+                        it.attributes.latitude,
+                        it.attributes.longitude,
+                        it.attributes.radius
+                    )
+                    .setExpirationDuration(Geofence.NEVER_EXPIRE)
+                    .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT)
+                    .build()
+            )
+        }
+        return geofencingRequestBuilder.build()
     }
 
     private fun getBatteryLevel(context: Context): Int? {
